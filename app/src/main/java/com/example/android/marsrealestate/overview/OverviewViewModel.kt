@@ -20,10 +20,10 @@ package com.example.android.marsrealestate.overview
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.android.marsrealestate.network.MarsApi
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import com.example.android.marsrealestate.network.MarsProperty
+import kotlinx.coroutines.launch
 
 /**
  * The [ViewModel] that is attached to the [OverviewFragment].
@@ -31,12 +31,18 @@ import retrofit2.Response
 class OverviewViewModel : ViewModel() {
 
     // The internal MutableLiveData String that stores the most recent response
-    private val _response = MutableLiveData<String>()
+    private val _status = MutableLiveData<String>()
 
     // The external immutable LiveData for the response String
-    val response: LiveData<String>
-        get() = _response
+    val status: LiveData<String>
+        get() = _status
 
+
+    //Create a liveData for our one MarsProperty in the viewmodel to expose the property URL to be loaded
+    private val _properties = MutableLiveData<List<MarsProperty>>()
+
+    val properties: LiveData<List<MarsProperty>>
+        get() = _properties
     /**
      * Call getMarsRealEstateProperties() on init so we can display status immediately.
      */
@@ -48,16 +54,23 @@ class OverviewViewModel : ViewModel() {
      * Sets the value of the response LiveData to the Mars API status or the successful number of
      * Mars properties retrieved.
      */
-    // TODO (07) Update getMarsRealEstateProperties to handle List<MarsProperty>
+    // Update getMarsRealEstateProperties to handle List<MarsProperty>
     private fun getMarsRealEstateProperties() {
-        MarsApi.retrofitService.getProperties().enqueue( object: Callback<String> {
-            override fun onFailure(call: Call<String>, t: Throwable) {
-                _response.value = "Failure: " + t.message
-            }
+        viewModelScope.launch {
+            //Retrieve data from the network without blocking the main thread
+            try{
+                var listResult = MarsApi.retrofitService.getProperties()
+                _status.value = "Success: ${listResult.size}"
+                if(listResult.size > 0) {
+                    //Update to set property to the first MarsProperty from the listResult
+                    _properties.value = listResult
+                }
 
-            override fun onResponse(call: Call<String>, response: Response<String>) {
-                _response.value = response.body()
+            } catch (e:Exception) {
+                _status.value = "Failure: ${e.message}"
             }
-        })
+        }
+
+
     }
 }
